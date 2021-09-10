@@ -25,6 +25,7 @@ from . import (
     DOMAIN as VICARE_DOMAIN,
     VICARE_API,
     VICARE_HEATING_TYPE,
+    VICARE_SOLAR,
     VICARE_NAME,
     HeatingType,
 )
@@ -69,6 +70,13 @@ SENSOR_POWER_PRODUCTION_TODAY = "power_production_today"
 SENSOR_POWER_PRODUCTION_THIS_WEEK = "power_production_this_week"
 SENSOR_POWER_PRODUCTION_THIS_MONTH = "power_production_this_month"
 SENSOR_POWER_PRODUCTION_THIS_YEAR = "power_production_this_year"
+
+# solar sensors
+SENSOR_SOLAR_COLLECTOR_TEMPERATURE = "solar_collector_temperature"
+SENSOR_SOLAR_WATER_TEMPERATURE = "solar_water_temperature"
+SENSOR_SOLAR_PRODUCTION_TODAY = "solar_production_today"
+SENSOR_SOLAR_PRODUCTION = "solar_production"
+SENSOR_SOLAR_HOURS = "solar_hours"
 
 SENSOR_TYPES = {
     SENSOR_OUTSIDE_TEMPERATURE: {
@@ -263,6 +271,35 @@ SENSOR_TYPES = {
         CONF_GETTER: lambda api: api.getPowerProductionThisYear(),
         CONF_DEVICE_CLASS: DEVICE_CLASS_ENERGY,
     },
+    #solar sensors
+    SENSOR_SOLAR_COLLECTOR_TEMPERATURE: {
+        CONF_NAME: "Solar Collector Temperature",
+        CONF_ICON: None,
+        CONF_UNIT_OF_MEASUREMENT: TEMP_CELSIUS,
+        CONF_GETTER: lambda api: api.getSolarCollectorTemperature(),
+        CONF_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+    },
+    SENSOR_SOLAR_PRODUCTION_TODAY: {
+        CONF_NAME: "Solar Production Today",
+        CONF_ICON: "mdi:counter",
+        CONF_UNIT_OF_MEASUREMENT: ENERGY_KILO_WATT_HOUR,
+        CONF_GETTER: lambda api: next(iter(api.getSolarPowerProduction())),
+        CONF_DEVICE_CLASS: DEVICE_CLASS_ENERGY,
+    },
+    SENSOR_POWER_PRODUCTION_THIS_WEEK: {
+        CONF_NAME: "Solar Production this week",
+        CONF_ICON: None,
+        CONF_UNIT_OF_MEASUREMENT: ENERGY_KILO_WATT_HOUR,
+        CONF_GETTER: lambda api: sum(api.getSolarPowerProduction()),
+        CONF_DEVICE_CLASS: DEVICE_CLASS_ENERGY,
+    },
+    SENSOR_SOLAR_WATER_TEMPERATURE: {
+        CONF_NAME: "Solar Storage Temperature",
+        CONF_ICON: None,
+        CONF_UNIT_OF_MEASUREMENT: TEMP_CELSIUS,
+        CONF_GETTER: lambda api: api.getSolarStorageTemperature(),
+        CONF_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+    },
 }
 
 SENSORS_GENERIC = [SENSOR_OUTSIDE_TEMPERATURE, SENSOR_SUPPLY_TEMPERATURE]
@@ -315,6 +352,12 @@ SENSORS_BY_HEATINGTYPE = {
     ],
 }
 
+SENSORS_SOLAR = [
+        SENSOR_SOLAR_COLLECTOR_TEMPERATURE,
+        SENSOR_SOLAR_PRODUCTION_TODAY,
+		SENSOR_POWER_PRODUCTION_THIS_WEEK,
+        SENSOR_SOLAR_WATER_TEMPERATURE,
+]
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Create the ViCare sensor devices."""
@@ -323,11 +366,15 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
     vicare_api = hass.data[VICARE_DOMAIN][VICARE_API]
     heating_type = hass.data[VICARE_DOMAIN][VICARE_HEATING_TYPE]
+    solar = hass.data[VICARE_DOMAIN][VICARE_SOLAR]
 
     sensors = SENSORS_GENERIC.copy()
 
     if heating_type != HeatingType.generic:
         sensors.extend(SENSORS_BY_HEATINGTYPE[heating_type])
+    
+    #if solar is True:
+    sensors.extend(SENSORS_SOLAR)
 
     add_entities(
         [
@@ -369,12 +416,12 @@ class ViCareSensor(SensorEntity):
         return self._sensor[CONF_ICON]
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the state of the sensor."""
         return self._state
 
     @property
-    def unit_of_measurement(self):
+    def native_unit_of_measurement(self):
         """Return the unit of measurement."""
         return self._sensor[CONF_UNIT_OF_MEASUREMENT]
 
@@ -388,6 +435,7 @@ class ViCareSensor(SensorEntity):
         try:
             with suppress(PyViCareNotSupportedFeatureError):
                 self._state = self._sensor[CONF_GETTER](self._api)
+                _LOGGER.info(self._state)
         except requests.exceptions.ConnectionError:
             _LOGGER.error("Unable to retrieve data from ViCare server")
         except ValueError:

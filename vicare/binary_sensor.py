@@ -15,6 +15,7 @@ from . import (
     DOMAIN as VICARE_DOMAIN,
     VICARE_API,
     VICARE_HEATING_TYPE,
+    VICARE_SOLAR,
     VICARE_NAME,
     HeatingType,
 )
@@ -30,6 +31,9 @@ SENSOR_BURNER_ACTIVE = "burner_active"
 
 # heatpump sensors
 SENSOR_COMPRESSOR_ACTIVE = "compressor_active"
+
+# solar sensors
+SENSOR_SOLAR_ACTIVE = "solar_active"
 
 SENSOR_TYPES = {
     SENSOR_CIRCULATION_PUMP_ACTIVE: {
@@ -49,9 +53,17 @@ SENSOR_TYPES = {
         CONF_DEVICE_CLASS: DEVICE_CLASS_POWER,
         CONF_GETTER: lambda api: api.getCompressorActive(),
     },
+    # solar sensors
+    SENSOR_SOLAR_ACTIVE: {
+        CONF_NAME: "Solar Pump Active",
+        CONF_DEVICE_CLASS: DEVICE_CLASS_POWER,
+        CONF_GETTER: lambda api: api.getSolarPumpActive(),
+    },
 }
 
 SENSORS_GENERIC = [SENSOR_CIRCULATION_PUMP_ACTIVE]
+
+SENSORS_SOLAR = [SENSOR_SOLAR_ACTIVE]
 
 SENSORS_BY_HEATINGTYPE = {
     HeatingType.gas: [SENSOR_BURNER_ACTIVE],
@@ -69,11 +81,15 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
     vicare_api = hass.data[VICARE_DOMAIN][VICARE_API]
     heating_type = hass.data[VICARE_DOMAIN][VICARE_HEATING_TYPE]
+    solar = hass.data[VICARE_DOMAIN][VICARE_SOLAR]
 
     sensors = SENSORS_GENERIC.copy()
 
     if heating_type != HeatingType.generic:
         sensors.extend(SENSORS_BY_HEATINGTYPE[heating_type])
+
+    #if solar is True:
+    sensors.extend(SENSORS_SOLAR)
 
     add_entities(
         [
